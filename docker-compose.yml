@@ -1,0 +1,13 @@
+name: saidi-attendance
+services:
+  attendance:
+    build: .
+    ports:
+      - "127.0.0.1:${SAIDI_PORT:-18081}:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8080/', timeout=3).close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
