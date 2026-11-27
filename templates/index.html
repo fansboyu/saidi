@@ -91,6 +91,65 @@ form,.result-panel { border:1px solid var(--line); border-radius:16px; backgroun
   .row .tile { width:30px; height:30px }
   .pick { padding-inline:8px }
 }
+/* Motion follows the upload workflow and respects the browser's motion preference. */
+header {
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  background:radial-gradient(ellipse at 88% 18%,#3267b5 0%,transparent 63%),linear-gradient(120deg,#101f3b,#1c3966);
+}
+header::after {
+  content:"";
+  position:absolute;
+  z-index:-1;
+  inset:-70% -10% -100% 53%;
+  transform:rotate(-16deg);
+  background:repeating-radial-gradient(ellipse at center,transparent 0 34px,#a0c9ff20 35px 36px,transparent 37px 49px);
+  mask-image:linear-gradient(110deg,transparent,#000 40%);
+  pointer-events:none;
+}
+.overview > div, .row, .pick, nav a, button, .download {
+  transition:background-color 180ms ease,border-color 180ms ease,box-shadow 180ms ease,transform 180ms ease;
+}
+.row:focus-within { border-color:#3970d8; box-shadow:0 0 0 3px #3970d823 }
+.row[data-ready="true"] { border-color:#9cbded; background:#eff6ff }
+.file-ready {
+  display:inline-block;
+  margin-left:6px;
+  color:#1d559e;
+  font-size:11px;
+  font-weight:700;
+  white-space:nowrap;
+}
+.row:not([data-ready="true"]) .file-ready { display:none }
+.row[data-ready="true"] .file-ready { animation:status-in 200ms ease-out both }
+.readiness-track { min-width:48px; height:4px; border-radius:10px; background:#e1eafa; margin-top:6px; overflow:hidden }
+.readiness-fill { display:block; width:var(--ready,0%); height:100%; border-radius:inherit; background:#3970d8; transition:width 240ms ease-out }
+#feedback[data-state="working"] progress {
+  appearance:none;
+  border:0;
+  border-radius:10px;
+  background:#dae7ff repeating-linear-gradient(115deg,#dae7ff 0 12px,#aec9fa 12px 24px);
+  background-size:53px 100%;
+  animation:progress-flow 900ms linear infinite;
+}
+#feedback[data-state="working"] progress::-webkit-progress-bar { background:transparent }
+#feedback[data-state="working"] progress::-moz-progress-bar { background:transparent }
+#feedback[data-state="success"] { background:#edf7f4 }
+#feedback[data-state="success"] progress { accent-color:#168060 }
+#feedback[data-state="success"] .download { animation:status-in 240ms ease-out both }
+@keyframes status-in { from { opacity:0; transform:translateY(4px) } to { opacity:1; transform:translateY(0) } }
+@keyframes progress-flow { to { background-position:53px 0 } }
+@media (hover:hover) {
+  .row:hover { border-color:#a6bee7; box-shadow:0 4px 14px #17376414; transform:translateY(-2px) }
+  .pick:hover { background:#eaf2ff }
+  button:not(:disabled):hover, .download:hover { transform:translateY(-2px); box-shadow:0 6px 16px #143d7a32 }
+}
+@media (prefers-reduced-motion:reduce) {
+  .overview > div, .row, .pick, nav a, button, .download, .readiness-fill { transition:none }
+  #feedback[data-state="working"] progress, #feedback[data-state="success"] .download, .row[data-ready="true"] .file-ready { animation:none }
+  .row:hover, button:not(:disabled):hover, .download:hover { transform:none }
+}
 </style>
 </head>
 <body>
@@ -110,7 +169,7 @@ form,.result-panel { border:1px solid var(--line); border-radius:16px; backgroun
     <p>集中整理打卡、员工清单与审批记录，一次生成考勤汇总表。</p>
   </header>
   <div class="overview" aria-label="整理概况">
-    <div><span class="tile mint" aria-hidden="true">▤</span><div><small>资料就绪</small><strong id="overview-count">0 / 4</strong></div></div>
+    <div><span class="tile mint" aria-hidden="true">▤</span><div><small>资料就绪</small><strong id="overview-count">0 / 4</strong><div class="readiness-track" aria-hidden="true"><span class="readiness-fill"></span></div></div></div>
     <div><span class="tile blue" aria-hidden="true">◷</span><div><small>处理状态</small><strong id="overview-state">待上传</strong></div></div>
     <div><span class="tile gold" aria-hidden="true">↓</span><div><small>输出文件</small><strong>Excel 汇总表</strong></div></div>
   </div>
@@ -188,6 +247,7 @@ const status = document.getElementById('status');
 const progress = document.getElementById('progress');
 const download = document.querySelector('.download');
 const overviewState = document.getElementById('overview-state');
+const readinessFill = document.querySelector('.readiness-fill');
 const resultEmpty = document.getElementById('result-empty');
 document.getElementById('connection').textContent = location.protocol === 'https:' ? 'HTTPS 加密连接' : '未使用 HTTPS';
 const security = document.getElementById('security');
@@ -222,6 +282,7 @@ async function rosterStorage(mode, operation) {
 function updateSelection() {
   const count = inputs.filter(input => input.files.length || (input === roster && savedRoster)).length;
   document.getElementById('overview-count').textContent = count + ' / 4';
+  readinessFill.style.setProperty('--ready', (count / inputs.length) * 100 + '%');
   resultEmpty.hidden = !feedback.hidden;
   overviewState.textContent = working ? '处理中' : download.getAttribute('href') ? '已完成' :
     (!feedback.hidden && feedback.dataset.state === 'error') ? '处理失败' :
@@ -245,6 +306,10 @@ function clearDownload() {
 
 for (const input of inputs) {
   const name = document.getElementById('name-' + input.id);
+  const readyLabel = document.createElement('span');
+  readyLabel.className = 'file-ready';
+  readyLabel.textContent = '✓ 就绪';
+  name.before(readyLabel);
   const hint = name.textContent;
   input.addEventListener('change', () => {
     const file = input.files[0];
@@ -310,6 +375,7 @@ form.addEventListener('submit', async event => {
     download.href = URL.createObjectURL(await response.blob());
     download.hidden = false;
     progress.value = 1;
+    feedback.dataset.state = 'success';
     status.textContent = '考勤汇总表已生成，可以下载。';
     if (shouldSave) {
       try {

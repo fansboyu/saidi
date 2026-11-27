@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "saidi-attendance",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-11-27",
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "saidi.clickadwave.org", "custom_domain": true }
+  ],
+  "assets": {
+    "directory": "./templates",
+    "run_worker_first": ["/process"]
+  }
+}

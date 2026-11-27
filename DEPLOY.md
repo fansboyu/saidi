@@ -1,5 +1,17 @@
 # 考勤工作台部署
 
+## Cloudflare Workers 与静态资源
+
+在项目目录运行 `npm ci` 安装依赖。使用 `npm run dev` 预览，使用 `npx wrangler login` 登录后运行 `npm run deploy` 发布。
+
+Wrangler 从 `templates/` 发布静态页面，`worker/index.ts` 处理同域的 `POST /process`。请求中的 Excel 文件只在生成报表时处理。发布时无需上传员工表格或配置存储。
+
+考勤日历集中在 `worker/calendar.ts`。新增年份时，按国务院办公厅通知录入放假起止日期、补班日期和来源链接，再发布 Worker。未配置的年份按普通周历处理，并在导出的「考勤日历」中标明。
+
+`wrangler.jsonc` 已声明正式域名 `saidi.clickadwave.org`，发布时 Wrangler 会绑定此域名。要单独创建预览环境，可使用其他 Worker 名称和不包含正式域名的 Wrangler 配置。保留旧 Caddy 与容器，便于需要时回退。
+
+## Docker 与 Caddy
+
 域名为 `saidi.clickadwave.org`。服务器上由现有 Caddy 接收 HTTPS 请求，再转发给独立的 Docker Compose 项目 `saidi-attendance`。
 
 ## Caddy 运行在宿主机
